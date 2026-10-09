@@ -6,6 +6,13 @@ Slimme zonnesturing voor een Vaillant-warmtepomp via eBUS. Doel: meer warm water
 
 **Eerst veilig uitproberen?** Zie [TESTEN.md](TESTEN.md): laat de kit meedraaien zonder iets naar de warmtepomp te sturen.
 
+> **Over dit project**
+> Dit is mijn eerste gedeelde project. De automations heb ik de afgelopen maanden voor mijn eigen warmtepomp gebouwd en stap voor stap verbeterd, met veel uitzoekwerk in grafieken en compressorstarts. Omdat meer mensen in mijn omgeving een Vaillant hebben, wil ik dat werk delen.
+>
+> Het draait bij mij dagelijks, maar het is getest op één installatie. Er kunnen dus gaten of fouten in zitten, zeker bij een andere regelaar, firmware of ebusd-configuratie. Begin daarom met [proefdraaien](TESTEN.md).
+>
+> Loop je ergens tegenaan, of heb je een verbetering? Open een [issue](https://github.com/coolnr/vaillant-wp-kit/issues). Elke melding helpt om de kit voor iedereen beter te maken.
+
 ## Wat zit erin
 
 | Onderdeel | Bestand | Wat het doet |
