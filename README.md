@@ -89,6 +89,29 @@ De kit is ontwikkeld en getest op deze installatie. Lijkt die van jou erop, dan 
 | Home Assistant | 2026.9 |
 | Zonnepanelen / netmeting | ca. 8 kWp, netvermogen via EVCC/P1-meter |
 
+### Instellingen van de warmtepomp
+
+De kit verandert alleen tijdelijk de boiler-setpoint, "1x laden" en de extra aanvoertemperatuur. Al het andere regelt de warmtepomp zelf, met deze instellingen in de regelaar (uitgelezen via ebusd):
+
+| Wat | Instelling | ebusd-naam |
+|---|---|---|
+| **Zone 1 – modus** | manueel (constante temperatuur, geen tijdprogramma) | `Z1OpMode` |
+| Zone 1 – temperatuur | 21 °C | `Z1ManualTemp` |
+| Stooklijn | 0,4, zelflerend aan | `Hc1HeatCurve`, `AdaptHeatCurve` |
+| Aanvoertemperatuur verwarmen | min 17 °C, max 45 °C | `Hc1HeatingFlowTempMin/Max` |
+| Zomergrens (verwarmen uit boven) | 17 °C buiten (gemiddeld) | `Hc1SummerTempLimit` |
+| Ruimtetemperatuur-invloed | uitgebreid | `Hc1RoomTempModulation` |
+| Koelen | mogelijk, standaard uit; min. aanvoer 18 °C, dauwpuntbewaking aan | `Z1CoolingOpMode`, `Hc1CoolingFlowTempMin` |
+| **Warm water – modus** | auto, met tijdvenster **13:00–17:00** | `HwcOpMode` |
+| Warm water – basis-setpoint | **38 °C** (de kit boost tijdelijk naar 54/60 °C) | `HwcTempDesired` |
+| Laadhysterese | 6 K (laadt pas onder 32 °C bij setpoint 38) | `CylinderChargeHyst` |
+| Legionella van Vaillant | **uit**: de kit regelt dit op zon | `HwcLegionellaDay` |
+| Stille modus | geen tijdvakken ingesteld | `SilentTimer` |
+
+**Waar stel je dit in?** Het zijn instellingen in de regelaar zelf. Je kunt ze wijzigen op de sensoCOMFORT (een deel alleen in het installateursmenu), een deel in de myVAILLANT-app, of via de ebusd-entities in Home Assistant. Het blijft dezelfde instelling; de laatste wijziging geldt.
+
+**Belangrijk voor de kit:** zet de blueprints op dezelfde basis-setpoint en laadhysterese als je warmtepomp, en laat het boostvenster samenvallen met het warmwater-tijdvenster. Gebruik je de legionella-blueprint, zet dan de legionella-functie van Vaillant zelf uit, anders doen ze het allebei.
+
 ### ebusd-instellingen (app "eBUSd")
 
 De ebusd-app van [LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons), versie 26.1, met deze instellingen:
@@ -110,7 +133,7 @@ De ebusd-app van [LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons)
 - **Een run die loopt, wordt altijd afgemaakt.** Terugzetten gebeurt pas na de laadbeurt.
 - **Rekening houden met de laadhysterese.** De WP laadt pas zo'n 6 K onder de setpoint. Een boost heeft dus alleen zin als de boiler laag genoeg zit.
 - **Herstartbestendig.** Geen lange wachtstappen en vangnetten op vaste tijden, zodat een setpoint nooit blijft hangen.
-- **Comfort blijft bij de WP.** De automations verhogen alleen tijdelijk en zetten terug. Valt HA uit, dan werkt de warmtepomp gewoon zoals ingesteld.
+- **Comfort blijft bij de WP.** De automations verhogen alleen tijdelijk en zetten terug. Valt HA uit, dan werkt de warmtepomp gewoon zoals ingesteld (zie [Instellingen van de warmtepomp](#instellingen-van-de-warmtepomp)).
 
 ## Let op
 
