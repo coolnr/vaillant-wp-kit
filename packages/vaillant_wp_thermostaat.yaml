@@ -1,0 +1,169 @@
+# =============================================================================
+# Vaillant WP-kit — thermostaatknoppen (optioneel)
+# =============================================================================
+# DOEL
+#   Met kale ebusd (MQTT) krijg je losse number- en select-entities, maar geen
+#   thermostaat. Dit package maakt er twee echte climate-entities van, zodat je
+#   de standaard thermostaatkaart (ronde klok) kunt gebruiken:
+#     - climate.vaillant_wp_zone_1  : vloer/zone 1 — verwarmen, koelen, uit
+#     - climate.vaillant_wp_boiler  : warm water — aan (auto), uit
+#
+# HOE
+#   - De temperatuur en modus worden rechtstreeks uit de ebusd-MQTT-topics
+#     gelezen.
+#   - Zone 1: verwarmen en koelen zijn bij Vaillant twee losse circuits, elk
+#     met een eigen modus en doeltemperatuur. Twee "bridge"-automations vertalen
+#     de ene thermostaatknop naar beide, zodat verwarmen en koelen nooit
+#     tegelijk aan staan (dat regelt tegen elkaar in en geeft extra starts).
+#   - Boiler: "heat" zet de boiler op auto (tijdprogramma blijft werken),
+#     "off" zet hem uit.
+#
+# INSTALLATIE
+#   1. Zet dit bestand in /config/packages/ (packages moeten aan staan, zie
+#      README).
+#   2. PAS AAN (zoeken en vervangen) als jouw namen afwijken:
+#        ebusd/basv3/         -> MQTT-prefix/regelaar (standaard ebusd + basv3)
+#        heating_ebusd_basv3  -> entity-prefix van je regelaar
+#   3. Herstart Home Assistant.
+#
+#   HEB JE AL EIGEN CLIMATE-ENTITIES voor je Vaillant (zelfgebouwd of via een
+#   andere integratie)? Installeer dit package dan NIET. Twee bridges op
+#   dezelfde topics sturen dubbel.
+#
+# KEUZE "MANUAL"
+#   Verwarmen zet Z1OpMode op "manual": constante temperatuur, geen
+#   tijdprogramma. Bij een warmtepomp met vloerverwarming is dat meestal het
+#   zuinigst. Wil je je tijdprogramma houden? Vervang dan in de bridge
+#   "manual" door "auto".
+#
+# HISTORIE
+#   2026-10-09: eerste versie, afgeleid van de testinstallatie. Boiler "heat"
+#               zet auto in plaats van manual, zodat het warmwater-tijdvenster
+#               blijft werken.
+# =============================================================================
+
+mqtt:
+  climate:
+    - name: "Vaillant WP zone 1"
+      unique_id: vaillant_wp_zone_1
+      icon: mdi:heat-pump-outline
+      current_temperature_topic: "ebusd/basv3/Z1RoomTemp"
+      current_temperature_template: "{{ value_json['value'].value }}"
+      temperature_state_topic: "ebusd/basv3/Z1ManualTemp"
+      temperature_state_template: >
+        {% if states('select.heating_ebusd_basv3_z1coolingopmode') not in ['off', 'unknown', 'unavailable'] %}
+          {{ states('number.heating_ebusd_basv3_z1coolingmanualtemp') }}
+        {% else %}
+          {{ value_json['value'].value }}
+        {% endif %}
+      temperature_command_topic: "ebusd/basv3/Z1_bridge_temp/set"
+      mode_state_topic: "ebusd/basv3/Z1OpMode"
+      mode_state_template: >
+        {% if value_json['value'].value != 'off' %}
+          heat
+        {% elif states('select.heating_ebusd_basv3_z1coolingopmode') not in ['off', 'unknown', 'unavailable'] %}
+          cool
+        {% else %}
+          off
+        {% endif %}
+      mode_command_topic: "ebusd/basv3/Z1_bridge_mode/set"
+      modes: ["heat", "cool", "off"]
+      min_temp: 15
+      max_temp: 28
+      temp_step: 0.5
+      precision: 0.5
+
+    - name: "Vaillant WP boiler"
+      unique_id: vaillant_wp_boiler
+      icon: mdi:water-boiler
+      current_temperature_topic: "ebusd/basv3/HwcStorageTemp"
+      current_temperature_template: "{{ value_json['value'].value }}"
+      temperature_state_topic: "ebusd/basv3/HwcTempDesired"
+      temperature_state_template: "{{ value_json['value'].value }}"
+      temperature_command_topic: "ebusd/basv3/HwcTempDesired/set"
+      mode_state_topic: "ebusd/basv3/HwcOpMode"
+      mode_state_template: >
+        {% if value_json['value'].value == 'off' %}
+          off
+        {% else %}
+          heat
+        {% endif %}
+      mode_command_topic: "ebusd/basv3/HwcOpMode/set"
+      mode_command_template: >
+        {% if value == 'off' %}
+          off
+        {% else %}
+          auto
+        {% endif %}
+      modes: ["heat", "off"]
+      min_temp: 35
+      max_temp: 65
+      temp_step: 1
+      precision: 1
+
+automation:
+  - id: vaillant_wp_zone1_bridge_mode
+    alias: "Vaillant WP – zone 1 thermostaat: modus"
+    description: >-
+      DOEL: de modusknop van climate.vaillant_wp_zone_1 vertalen naar de Vaillant.
+      Verwarmen en koelen zijn twee losse circuits met elk een eigen select.
+      HOE: heat -> verwarmen manual + koelen off. cool -> koelen manual +
+      verwarmen off. Al het andere -> beide off. Zo staan ze nooit tegelijk aan.
+      Onderdeel van de Vaillant WP-kit (packages/vaillant_wp_thermostaat.yaml).
+    mode: queued
+    triggers:
+      - trigger: mqtt
+        topic: "ebusd/basv3/Z1_bridge_mode/set"
+    actions:
+      - choose:
+          - conditions: "{{ trigger.payload == 'heat' }}"
+            sequence:
+              - action: select.select_option
+                target: {entity_id: select.heating_ebusd_basv3_z1opmode}
+                data: {option: manual}
+              - action: select.select_option
+                target: {entity_id: select.heating_ebusd_basv3_z1coolingopmode}
+                data: {option: "off"}
+          - conditions: "{{ trigger.payload == 'cool' }}"
+            sequence:
+              - action: select.select_option
+                target: {entity_id: select.heating_ebusd_basv3_z1coolingopmode}
+                data: {option: manual}
+              - action: select.select_option
+                target: {entity_id: select.heating_ebusd_basv3_z1opmode}
+                data: {option: "off"}
+        default:
+          - action: select.select_option
+            target: {entity_id: select.heating_ebusd_basv3_z1opmode}
+            data: {option: "off"}
+          - action: select.select_option
+            target: {entity_id: select.heating_ebusd_basv3_z1coolingopmode}
+            data: {option: "off"}
+
+  - id: vaillant_wp_zone1_bridge_temp
+    alias: "Vaillant WP – zone 1 thermostaat: temperatuur"
+    description: >-
+      DOEL: de temperatuur van climate.vaillant_wp_zone_1 op de juiste Vaillant-
+      setpoint zetten. HOE: staat koelen aan, dan naar Z1CoolingManualTemp,
+      anders naar Z1ManualTemp. TIP: kies bij koelen een ruime doeltemperatuur
+      (bijv. 23-24 °C); te krap laat de warmtepomp pendelen.
+      Onderdeel van de Vaillant WP-kit (packages/vaillant_wp_thermostaat.yaml).
+    mode: queued
+    triggers:
+      - trigger: mqtt
+        topic: "ebusd/basv3/Z1_bridge_temp/set"
+    actions:
+      - if:
+          - condition: not
+            conditions:
+              - condition: state
+                entity_id: select.heating_ebusd_basv3_z1coolingopmode
+                state: "off"
+        then:
+          - action: number.set_value
+            target: {entity_id: number.heating_ebusd_basv3_z1coolingmanualtemp}
+            data: {value: "{{ trigger.payload }}"}
+        else:
+          - action: number.set_value
+            target: {entity_id: number.heating_ebusd_basv3_z1manualtemp}
+            data: {value: "{{ trigger.payload }}"}

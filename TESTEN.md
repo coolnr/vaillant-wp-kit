@@ -38,6 +38,8 @@ Download van GitHub en zet in `/config/packages/`:
 
 Tip: klik met rechts op de link en kies *Link opslaan als…*, of open hem en kopieer de inhoud naar een nieuw bestand met dezelfde naam.
 
+**Niet** plaatsen tijdens proefdraaien: `vaillant_wp_thermostaat.yaml` als je al eigen thermostaat-entities voor je Vaillant hebt. Die stuurt namelijk wél echt naar de warmtepomp.
+
 Open `vaillant_wp.yaml` en vervang:
 
 | Zoek | Vervang door | Voorbeeld |

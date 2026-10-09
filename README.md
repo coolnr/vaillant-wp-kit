@@ -26,6 +26,7 @@ Proefdraaien gebruikt dezelfde bestanden en stappen als een gewone installatie. 
 | Onderdeel | Bestand | Wat het doet |
 |---|---|---|
 | Basispackage | `packages/vaillant_wp.yaml` | Vaste `wp_*`-sensoren bovenop ebusd, netvermogen zonder WP-verbruik, laadtijd vandaag, compressorstarts per dag, helpers voor legionella en vakantie |
+| Thermostaatknoppen (optioneel) | `packages/vaillant_wp_thermostaat.yaml` | Twee climate-entities (zone 1 en boiler) voor de standaard thermostaatkaart; met kale ebusd heb je die niet |
 | Proefdraaien (optioneel) | `packages/vaillant_wp_proefdraaien.yaml` | TEST-helpers, zodat de blueprints kunnen meedraaien zonder de warmtepomp aan te sturen |
 | Blueprint | `vaillant_zonne_boost_warm_water.yaml` | Boiler-setpoint omhoog bij zonne-overschot, en veilig terug na de laadbeurt |
 | Blueprint | `vaillant_legionella_op_zon.yaml` | Wekelijkse 60 °C-desinfectie, bij voorkeur op zon, met vangnet en time-out |
@@ -52,6 +53,7 @@ Proefdraaien gebruikt dezelfde bestanden en stappen als een gewone installatie. 
      - `heating_ebusd_basv3` → de prefix van je regelaar
      - `ebusd_hmu` → de prefix van je buitenunit
    - Herstart HA en controleer of de `wp_*`-sensoren een waarde hebben.
+   - *Optioneel:* wil je een thermostaatknop (ronde klok) voor de vloer en de boiler? Zet ook [`packages/vaillant_wp_thermostaat.yaml`](https://raw.githubusercontent.com/coolnr/vaillant-wp-kit/main/packages/vaillant_wp_thermostaat.yaml) in `/config/packages/`. **Niet doen als je al eigen climate-entities voor je Vaillant hebt.**
 2. **Blueprints**: klik per blueprint op de knop hieronder. Je eigen Home Assistant opent en vraagt of je hem wilt importeren.
 
    | Blueprint | Importeren |
@@ -122,6 +124,9 @@ MIT, zie [LICENSE](LICENSE). Gebruik op eigen risico. Niet gelieerd aan Vaillant
 
 ## Wijzigingen
 
+- **Na 0.2 (in ontwikkeling):**
+  - Optioneel package met thermostaatknoppen (climate) voor zone 1 en de boiler.
+  - ebusd-instellingen en testinstallatie gedocumenteerd.
 - **0.2 (9 okt 2026):**
   - Proefdraaimodus: doelen mogen ook `input_number` of `input_select` zijn.
   - Elke beslissing komt in het logboek ("Vaillant WP-kit").
