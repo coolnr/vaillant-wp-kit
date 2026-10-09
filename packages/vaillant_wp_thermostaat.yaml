@@ -39,7 +39,7 @@
 # HISTORIE
 #   2026-10-09: eerste versie, afgeleid van de testinstallatie. Boiler "heat"
 #               zet auto in plaats van manual, zodat het warmwater-tijdvenster
-#               blijft werken.
+#               blijft werken. Opfris-automation tegen "onbekend" na herstart.
 # =============================================================================
 
 mqtt:
@@ -167,3 +167,37 @@ automation:
           - action: number.set_value
             target: {entity_id: number.heating_ebusd_basv3_z1manualtemp}
             data: {value: "{{ trigger.payload }}"}
+
+  - id: vaillant_wp_thermostaat_verversen
+    alias: "Vaillant WP – thermostaat: waarden opvragen"
+    description: >-
+      DOEL: na een herstart of het herladen van MQTT staan de thermostaten op
+      "onbekend", omdat ebusd een waarde pas opnieuw stuurt als die verandert.
+      HOE: vraagt ebusd (via de /get-topics) om de waarden direct opnieuw te
+      sturen. Alleen lezen; er wordt niets naar de warmtepomp geschreven.
+      Onderdeel van de Vaillant WP-kit (packages/vaillant_wp_thermostaat.yaml).
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: state
+        entity_id:
+          - climate.vaillant_wp_zone_1
+          - climate.vaillant_wp_boiler
+        to: unknown
+        for: {seconds: 30}
+    actions:
+      - delay: {seconds: 20}
+      - repeat:
+          for_each:
+            - Z1OpMode
+            - Z1ManualTemp
+            - Z1RoomTemp
+            - HwcOpMode
+            - HwcTempDesired
+            - HwcStorageTemp
+          sequence:
+            - action: mqtt.publish
+              data:
+                topic: "ebusd/basv3/{{ repeat.item }}/get"
+                payload: ""
