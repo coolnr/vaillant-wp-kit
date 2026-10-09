@@ -135,7 +135,7 @@ template:
 
 utility_meter:
   # Compressorstarts per dag: de belangrijkste KPI voor slijtage.
-  vaillant_wp_compressorstarts_vandaag:
+  wp_compressorstarts_vandaag:
     name: WP compressorstarts vandaag
     unique_id: vaillant_wp_compressorstarts_vandaag
     source: sensor.wp_compressorstarts_totaal
