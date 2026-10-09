@@ -87,6 +87,19 @@ De kit is ontwikkeld en getest op deze installatie. Lijkt die van jou erop, dan 
 | Home Assistant | 2026.9 |
 | Zonnepanelen / netmeting | ca. 8 kWp, netvermogen via EVCC/P1-meter |
 
+### ebusd-instellingen (app "eBUSd")
+
+De ebusd-app van [LukasGrebe/ha-addons](https://github.com/LukasGrebe/ha-addons), versie 26.1, met deze instellingen:
+
+| Instelling | Waarde | Waarom |
+|---|---|---|
+| Seed HA MQTT integration config | **aan** | Maakt de MQTT-discovery-config aan, zodat de ebusd-waarden als entities in HA verschijnen |
+| `--device=` | `ens:<IP-van-je-adapter>:9999` | Netwerkadapter, enhanced protocol |
+| `--mqttjson` | | Waarden als JSON naar MQTT |
+| `--scanconfig` | | Herkent automatisch welke Vaillant-apparaten op de bus zitten |
+| `--configpath=` | `https://ebus.github.io/next/` | Nieuwste berichtdefinities; nodig voor recente regelaars zoals de VRC 720f (`BASV3`) |
+| `--mqttvar=` | `filter-direction=r\|u\|^w,filter-name=` | Publiceert ook **schrijfbare** waarden. Zonder deze regel krijg je geen `number`/`select`-entities (setpoints, modi) en kan de kit niets sturen |
+
 **Andere opstelling?** Een uniTOWER, een andere regelaar (VRC 700/`BASV2`), meerdere zones of radiatoren kunnen andere entity-namen of gedrag geven. Proefdraaien laat snel zien of het werkt. Meld het in een issue, dan voegen we je opstelling toe aan de lijst.
 
 ## Ontwerpprincipes
