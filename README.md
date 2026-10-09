@@ -25,8 +25,8 @@ Slimme zonnesturing voor een Vaillant-warmtepomp via eBUS. Doel: meer warm water
 
 ## Vereisten
 
-- Vaillant aroTHERM (plus) met sensoCOMFORT / VRC 720 (**getest: BASV3**)
-- eBUS-adapter (bijv. ebusd-adapter v5) + **ebusd add-on** met MQTT-discovery
+- Vaillant aroTHERM (plus) met sensoCOMFORT / VRC 720 (**getest: BASV3**, zie [Mijn testinstallatie](#mijn-testinstallatie))
+- eBUS-adapter + **ebusd-app** met MQTT-discovery
 - Een sensor voor het **netvermogen in W** (afname positief, teruglevering negatief), bijv. van P1-meter of EVCC
 - Home Assistant 2024.10 of nieuwer
 
@@ -61,6 +61,25 @@ Slimme zonnesturing voor een Vaillant-warmtepomp via eBUS. Doel: meer warm water
    - zone: een `climate.…` of de ebusd-zonemodus `select.…_z1opmode`
 4. **Stel de basis-setpoint in de WP zelf** gelijk aan die in de blueprints (standaard 38 °C).
 5. **Start de legionella-teller**: zet `input_datetime.vaillant_wp_laatste_legionella` op de datum van de laatste keer dat de boiler 60 °C was.
+
+## Mijn testinstallatie
+
+De kit is ontwikkeld en getest op deze installatie. Lijkt die van jou erop, dan is de kans groot dat alles direct werkt.
+
+| Onderdeel | Type |
+|---|---|
+| Buitenunit | aroTHERM plus **VWL 75/6** 230 V (7,5 kW), lucht/water |
+| Binnenmodule | **VWZ AI** besturingsmodule (eBUS-adres 76) + muurbeugel, driewegklep, losse cv-pomp |
+| Regelaar | **sensoCOMFORT VRC 720f** met draadloze buitenvoeler (ebusd: `BASV3`, adres 15) |
+| Internetmodule | myVAILLANT connect **VR 940f** |
+| Warm water | **uniSTOR plus 300 liter** boiler (VIH RW 300) |
+| Buffervat | 50 liter |
+| Afgifte | vloerverwarming, één zone (Z1); koelen mogelijk |
+| Koppeling met HA | ebusd 26.1 via **MQTT** (eBUS-adapter → ebusd-app → MQTT) |
+| Home Assistant | 2026.9 |
+| Zonnepanelen / netmeting | ca. 8 kWp, netvermogen via EVCC/P1-meter |
+
+**Andere opstelling?** Een uniTOWER, een andere regelaar (VRC 700/`BASV2`), meerdere zones of radiatoren kunnen andere entity-namen of gedrag geven. Proefdraaien laat snel zien of het werkt. Meld het in een issue, dan voegen we je opstelling toe aan de lijst.
 
 ## Ontwerpprincipes
 

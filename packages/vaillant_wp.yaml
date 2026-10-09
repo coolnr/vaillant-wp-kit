@@ -18,7 +18,7 @@
 #   3. Herstart Home Assistant.
 #
 # GETEST MET
-#   aroTHERM plus + sensoCOMFORT (BASV3) via ebusd-adapter v5, ebusd MQTT-discovery.
+#   aroTHERM plus VWL 75/6 + VWZ AI + sensoCOMFORT VRC 720f (BASV3), ebusd MQTT-discovery.
 #   Andere regelaars: eerst controleren of de entities hieronder bestaan.
 #
 # HISTORIE
