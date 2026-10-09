@@ -4,12 +4,20 @@ Slimme zonnesturing voor een Vaillant-warmtepomp via eBUS. Doel: meer warm water
 
 *Versie 0.2 (oktober 2026), afgeleid van een productie-installatie die sinds mei 2026 draait.*
 
-**Eerst veilig uitproberen?** Zie [TESTEN.md](TESTEN.md): laat de kit meedraaien zonder iets naar de warmtepomp te sturen.
+## Waar begin je?
+
+| Jouw situatie | Aanpak |
+|---|---|
+| Je hebt **nog geen** eigen automations die je warmtepomp sturen, en je opstelling lijkt op [mijn testinstallatie](#mijn-testinstallatie) | **Direct installeren**: volg [Installatie](#installatie) en kies meteen de echte ebusd-entities. |
+| Je hebt **al eigen automations** voor je warmtepomp | **Eerst proefdraaien** ([TESTEN.md](TESTEN.md)). Anders sturen twee automations tegelijk aan dezelfde knop. |
+| Je opstelling **wijkt af** (andere regelaar, uniTOWER, radiatoren, meerdere zones) of je wilt het voorzichtig aanpakken | **Eerst proefdraaien** ([TESTEN.md](TESTEN.md)): een paar dagen kijken wat de kit zou doen, zonder dat hij iets naar de warmtepomp stuurt. |
+
+Proefdraaien gebruikt dezelfde bestanden en stappen als een gewone installatie. Je kiest alleen andere doelen. Overstappen naar echt is daarna een kwestie van de doelen omzetten.
 
 > **Over dit project**
 > Dit is mijn eerste gedeelde project. De automations heb ik de afgelopen maanden voor mijn eigen warmtepomp gebouwd en stap voor stap verbeterd, met veel uitzoekwerk in grafieken en compressorstarts. Omdat meer mensen in mijn omgeving een Vaillant hebben, wil ik dat werk delen.
 >
-> Het draait bij mij dagelijks, maar het is getest op één installatie. Er kunnen dus gaten of fouten in zitten, zeker bij een andere regelaar, firmware of ebusd-configuratie. Begin daarom met [proefdraaien](TESTEN.md).
+> Het draait bij mij dagelijks, maar het is getest op één installatie. Er kunnen dus gaten of fouten in zitten, zeker bij een andere regelaar, firmware of ebusd-configuratie. Twijfel je? Begin dan met proefdraaien (zie *Waar begin je?* hieronder).
 >
 > Loop je ergens tegenaan, of heb je een verbetering? Open een [issue](https://github.com/coolnr/vaillant-wp-kit/issues). Elke melding helpt om de kit voor iedereen beter te maken.
 

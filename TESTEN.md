@@ -4,7 +4,10 @@ Met proefdraaien laat je de blueprints een paar dagen meedraaien **zonder dat ze
 
 Je gebruikt hiervoor **dezelfde bestanden en dezelfde installatiestappen** als bij een gewone installatie. Je kiest alleen bij het aanmaken van de automations de TEST-helpers als doel. Zo test je ook meteen de installatie-instructies.
 
-**Wanneer handig:** als je al eigen automations hebt die de warmtepomp sturen, of als je eerst wilt zien wat de kit doet.
+**Moet ik proefdraaien?**
+- **Ja**, als je al eigen automations hebt die je warmtepomp sturen. Anders sturen twee automations tegelijk aan dezelfde boiler-setpoint.
+- **Aangeraden**, als je opstelling afwijkt van de [testinstallatie](README.md#mijn-testinstallatie) of als je het voorzichtig wilt aanpakken.
+- **Niet nodig**, als je nog geen eigen sturing hebt en je opstelling erop lijkt. Volg dan gewoon de [installatie in de README](README.md#installatie).
 
 ---
 
