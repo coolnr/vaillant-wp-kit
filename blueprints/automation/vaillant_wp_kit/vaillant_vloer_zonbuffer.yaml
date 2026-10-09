@@ -1,0 +1,154 @@
+blueprint:
+  name: "Vaillant WP – vloer als zonnebuffer"
+  author: coolnr
+  source_url: https://github.com/coolnr/vaillant-wp-kit/blob/main/blueprints/automation/vaillant_wp_kit/vaillant_vloer_zonbuffer.yaml
+  description: |
+    **Doel:** de vloerverwarming gebruiken als warmtebuffer voor zonnestroom. Bij echt overschot gaat de aanvoertemperatuur van de zone een paar graden omhoog (ebusd `Hc1ExcessTemp`), zodat de vloer overdag extra warmte opslaat en de warmtepomp 's avonds minder hoeft.
+
+    **Hoe**
+    - Aan: overschot boven de drempel (10 min), zone staat aan (niet uit of koelen), buiten (gemiddeld) en binnen niet te warm.
+    - Uit: overschot weg (15 min) of uiterlijk op de deadline.
+
+    Begin met 2 K en stel bij zodra je ziet hoe de vloer reageert. Gebruik de netvermogen-sensor **zonder** WP-verbruik, anders schakelt de buffer midden in een run uit en weer aan.
+
+    Vereist: package `vaillant_wp.yaml`. Getest met sensoCOMFORT (BASV3) via ebusd.
+  domain: automation
+  homeassistant:
+    min_version: "2024.10.0"
+  input:
+    entities:
+      name: Entities
+      icon: mdi:link-variant
+      input:
+        net_power:
+          name: Netvermogen excl. warmtepomp (W)
+          default: sensor.wp_netvermogen_excl_warmtepomp
+          selector:
+            entity:
+              filter: {domain: sensor, device_class: power}
+        zone_climate:
+          name: Zone (climate of zone-modus)
+          description: Een climate-entity van de zone, of de ebusd-modus (bijv. select.…_z1opmode). De buffer werkt alleen als die niet op 'off' (of 'cool') staat.
+          selector:
+            entity:
+              filter: {domain: [climate, select]}
+        outside_temp:
+          name: Buitentemperatuur (gemiddeld)
+          default: sensor.wp_buitentemperatuur_gemiddeld
+          selector:
+            entity:
+              filter: {domain: sensor, device_class: temperature}
+        room_temp:
+          name: Kamertemperatuur zone
+          default: sensor.wp_kamertemperatuur_zone_1
+          selector:
+            entity:
+              filter: {domain: sensor, device_class: temperature}
+        excess_temp:
+          name: Extra aanvoertemperatuur (ebusd Hc1ExcessTemp)
+          description: Proefdraaien? Kies input_number.vaillant_wp_test_vloer_boost, dan stuurt de automation niets naar de warmtepomp.
+          selector:
+            entity:
+              filter: {domain: [number, input_number]}
+    instellingen:
+      name: Instellingen
+      icon: mdi:tune
+      input:
+        boost_k:
+          name: Extra aanvoertemperatuur bij overschot (K)
+          default: 2
+          selector:
+            number: {min: 1, max: 6, step: 0.5, unit_of_measurement: K}
+        threshold_on:
+          name: Overschot voor aan (W)
+          default: 2500
+          selector:
+            number: {min: 500, max: 10000, step: 100, unit_of_measurement: W}
+        threshold_off:
+          name: Overschot 'weg' onder (W)
+          default: 500
+          selector:
+            number: {min: 0, max: 5000, step: 100, unit_of_measurement: W}
+        max_outside:
+          name: Alleen als buiten onder (°C)
+          default: 17
+          selector:
+            number: {min: 5, max: 25, step: 0.5, unit_of_measurement: "°C"}
+        max_room:
+          name: Alleen als binnen onder (°C)
+          default: 22
+          selector:
+            number: {min: 18, max: 26, step: 0.5, unit_of_measurement: "°C"}
+        deadline:
+          name: Uiterlijk uit om
+          default: "19:00:00"
+          selector:
+            time: {}
+
+mode: single
+
+trigger_variables:
+  net_power: !input net_power
+  th_on: !input threshold_on
+  th_off: !input threshold_off
+
+variables:
+  zone: !input zone_climate
+  excess_temp: !input excess_temp
+  outside_temp: !input outside_temp
+  room_temp: !input room_temp
+  boost_k: !input boost_k
+  max_outside: !input max_outside
+  max_room: !input max_room
+
+triggers:
+  - id: aan
+    trigger: template
+    value_template: "{{ states(net_power) | float(0) <= -th_on }}"
+    for: {minutes: 10}
+  - id: uit
+    trigger: template
+    value_template: "{{ states(net_power) | float(0) > -th_off }}"
+    for: {minutes: 15}
+  - id: uit
+    trigger: time
+    at: !input deadline
+
+actions:
+  - choose:
+      - alias: Buffer aan
+        conditions:
+          - condition: trigger
+            id: aan
+          - alias: Zone staat aan en niet op koelen
+            condition: template
+            value_template: "{{ states(zone) not in ['off', 'cool', 'unavailable', 'unknown'] }}"
+          - condition: template
+            value_template: >
+              {{ states(outside_temp) | float(99) < max_outside
+                 and states(room_temp) | float(99) < max_room
+                 and states(excess_temp) | float(0) < boost_k }}
+        sequence:
+          - action: "{{ excess_temp.split('.')[0] }}.set_value"
+            target: {entity_id: !input excess_temp}
+            data: {value: "{{ boost_k }}"}
+          - action: logbook.log
+            data:
+              name: Vaillant WP-kit
+              message: "Vloerbuffer aan: +{{ boost_k }} K"
+              entity_id: !input excess_temp
+      - alias: Buffer uit
+        conditions:
+          - condition: trigger
+            id: uit
+          - condition: template
+            value_template: "{{ states(excess_temp) | float(0) > 0 }}"
+        sequence:
+          - action: "{{ excess_temp.split('.')[0] }}.set_value"
+            target: {entity_id: !input excess_temp}
+            data: {value: 0}
+          - action: logbook.log
+            data:
+              name: Vaillant WP-kit
+              message: "Vloerbuffer uit"
+              entity_id: !input excess_temp

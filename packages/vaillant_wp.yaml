@@ -1,0 +1,142 @@
+# =============================================================================
+# Vaillant WP-kit — basispackage
+# =============================================================================
+# DOEL
+#   Eén vaste set entities (vaillant_wp_*) bovenop de ruwe ebusd-entities, zodat
+#   blueprints en dashboard bij elke installatie hetzelfde werken.
+#
+# INSTALLATIE
+#   1. Zet dit bestand in /config/packages/ en zorg dat configuration.yaml bevat:
+#        homeassistant:
+#          packages: !include_dir_named packages
+#   2. PAS AAN (eenmalig, zoeken-en-vervangen in dit bestand):
+#        sensor.JOUW_NETVERMOGEN  -> je netvermogen-sensor in W
+#                                    (afname positief, teruglevering negatief)
+#        heating_ebusd_basv3      -> prefix van je regelaar (sensoCOMFORT/VRC720),
+#                                    bijv. ebusd_basv2 of ebusd_basv3
+#        ebusd_hmu                -> prefix van je buitenunit (HMU)
+#   3. Herstart Home Assistant.
+#
+# GETEST MET
+#   aroTHERM plus + sensoCOMFORT (BASV3) via ebusd-adapter v5, ebusd MQTT-discovery.
+#   Andere regelaars: eerst controleren of de entities hieronder bestaan.
+#
+# HISTORIE
+#   2026-10-08: eerste versie, afgeleid van de productie-setup (categorie WP).
+# =============================================================================
+
+input_boolean:
+  vaillant_wp_legionella_actief:
+    name: WP legionella-cyclus actief
+    icon: mdi:bacteria-outline
+  vaillant_wp_vakantie:
+    name: WP vakantiemodus
+    icon: mdi:airplane
+
+input_datetime:
+  vaillant_wp_laatste_legionella:
+    name: WP laatste legionella-cyclus
+    has_date: true
+    has_time: true
+    icon: mdi:calendar-check
+
+sensor:
+  # Hoe lang de WP vandaag warm water heeft geladen. Gebruikt om te bepalen of
+  # een zonne-boost een laadbeurt vervangt (geen extra compressorstart) of niet.
+  - platform: history_stats
+    name: WP boiler laadtijd vandaag
+    unique_id: vaillant_wp_boiler_laadtijd_vandaag
+    entity_id: sensor.ebusd_hmu_rundatastatuscode
+    state:
+      - hwc_prerun
+      - hwc_compressor_active
+    type: time
+    start: "{{ today_at() }}"
+    end: "{{ now() }}"
+
+template:
+  - sensor:
+      # Zonne-overschot ZONDER het verbruik van de warmtepomp zelf.
+      # Waarom: met het gewone netvermogen eet een draaiende compressor het
+      # overschot op, waarna automations de run afbreken en er extra
+      # compressorstarts ontstaan.
+      - name: WP netvermogen excl warmtepomp
+        unique_id: vaillant_wp_netvermogen_excl_wp
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:solar-power-variant
+        availability: "{{ has_value('sensor.JOUW_NETVERMOGEN') }}"
+        state: >
+          {% set net = states('sensor.JOUW_NETVERMOGEN') | float(0) %}
+          {% set wp = states('sensor.ebusd_hmu_powerconsumptionhmu') | float(0) * 1000 %}
+          {{ (net - wp) | round(0) }}
+
+      # Genormaliseerde namen voor het dashboard.
+      - name: WP boiler temperatuur
+        unique_id: vaillant_wp_boiler_temp
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        availability: "{{ has_value('sensor.heating_ebusd_basv3_hwcstoragetemp') }}"
+        state: "{{ states('sensor.heating_ebusd_basv3_hwcstoragetemp') | float }}"
+
+      - name: WP aanvoertemperatuur
+        unique_id: vaillant_wp_aanvoer_temp
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        availability: "{{ has_value('sensor.ebusd_hmu_flowtemp') }}"
+        state: "{{ states('sensor.ebusd_hmu_flowtemp') | float }}"
+
+      - name: WP buitentemperatuur gemiddeld
+        unique_id: vaillant_wp_buiten_temp_gem
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        availability: "{{ has_value('sensor.heating_ebusd_basv3_outsidetempavg') }}"
+        state: "{{ states('sensor.heating_ebusd_basv3_outsidetempavg') | float }}"
+
+      - name: WP kamertemperatuur zone 1
+        unique_id: vaillant_wp_kamer_temp_z1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        availability: "{{ has_value('sensor.heating_ebusd_basv3_z1roomtemp') }}"
+        state: "{{ states('sensor.heating_ebusd_basv3_z1roomtemp') | float }}"
+
+      - name: WP elektrisch vermogen
+        unique_id: vaillant_wp_vermogen
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        availability: "{{ has_value('sensor.ebusd_hmu_powerconsumptionhmu') }}"
+        state: "{{ (states('sensor.ebusd_hmu_powerconsumptionhmu') | float * 1000) | round(0) }}"
+
+      - name: WP compressorstarts totaal
+        unique_id: vaillant_wp_compressorstarts
+        state_class: total_increasing
+        icon: mdi:counter
+        availability: "{{ has_value('sensor.ebusd_hmu_runstatscompressorstarts') }}"
+        state: "{{ states('sensor.ebusd_hmu_runstatscompressorstarts') | int }}"
+
+      - name: WP status
+        unique_id: vaillant_wp_status
+        icon: mdi:heat-pump-outline
+        state: >
+          {% set s = states('sensor.ebusd_hmu_rundatastatuscode') %}
+          {% if s.startswith('hwc_') %}Warm water
+          {% elif s.startswith('heat_') %}Verwarmen
+          {% elif s.startswith('cool_') %}Koelen
+          {% elif s == 'deicing_active' %}Ontdooien
+          {% elif s == 'standby' %}Stand-by
+          {% elif s in ['unavailable', 'unknown'] %}Geen verbinding
+          {% else %}{{ s }}{% endif %}
+
+utility_meter:
+  # Compressorstarts per dag: de belangrijkste KPI voor slijtage.
+  vaillant_wp_compressorstarts_vandaag:
+    name: WP compressorstarts vandaag
+    unique_id: vaillant_wp_compressorstarts_vandaag
+    source: sensor.wp_compressorstarts_totaal
+    cycle: daily

@@ -1,0 +1,51 @@
+# =============================================================================
+# Vaillant WP-kit — proefdraaien (optioneel)
+# =============================================================================
+# DOEL
+#   De blueprints veilig laten meedraaien zónder iets naar de warmtepomp te
+#   sturen. Je kiest in de blueprint deze TEST-helpers als doel in plaats van
+#   de echte ebusd-entities. De automation neemt dan precies dezelfde
+#   beslissingen, maar schrijft alleen naar deze helpers.
+#
+# WANNEER
+#   - Je hebt al eigen automations die de warmtepomp sturen (dubbele sturing
+#     voorkomen).
+#   - Je wilt eerst een paar dagen zien wat de kit zou doen.
+#
+# VERGELIJKEN
+#   Zet in een geschiedenisgrafiek de echte boiler-setpoint naast
+#   input_number.vaillant_wp_test_boiler_setpoint. In het logboek staat bij
+#   elke beslissing een regel van "Vaillant WP-kit".
+#
+# KLAAR MET PROEFDRAAIEN
+#   Kies in de automations de echte entities, en verwijder daarna dit bestand.
+#
+# HISTORIE
+#   2026-10-09: eerste versie.
+# =============================================================================
+
+input_number:
+  vaillant_wp_test_boiler_setpoint:
+    name: TEST boiler-setpoint
+    icon: mdi:test-tube
+    min: 20
+    max: 70
+    step: 1
+    unit_of_measurement: "°C"
+    mode: box
+  vaillant_wp_test_vloer_boost:
+    name: TEST vloer extra aanvoer
+    icon: mdi:test-tube
+    min: 0
+    max: 10
+    step: 0.5
+    unit_of_measurement: K
+    mode: box
+
+input_select:
+  vaillant_wp_test_sfmode:
+    name: TEST speciale functie warm water
+    icon: mdi:test-tube
+    options:
+      - auto
+      - load

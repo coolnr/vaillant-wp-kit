@@ -1,0 +1,6 @@
+# Lokale/ persoonlijke bestanden horen niet in de repo
+secrets.yaml
+*.local.yaml
+.DS_Store
+__pycache__/
+*.zip

@@ -1,0 +1,311 @@
+blueprint:
+  name: "Vaillant WP – legionella op zon"
+  author: coolnr
+  source_url: https://github.com/coolnr/vaillant-wp-kit/blob/main/blueprints/automation/vaillant_wp_kit/vaillant_legionella_op_zon.yaml
+  description: |
+    **Doel:** bij een lage boiler-setpoint (bijv. 38 °C) groeit legionella goed. Deze automation verwarmt de boiler daarom ongeveer eens per week tot 60 °C (thermische desinfectie), zoveel mogelijk op zonnestroom en zonder extra compressorstarts.
+
+    **Hoe**
+    - Flexibel venster: vanaf dag *min* op zon, uiterlijk op dag *max* een vangnet-run.
+    - Laadt de compressor al warm water en is er genoeg zon: de lopende run wordt doorgezet naar 60 °C.
+    - Staat de WP stil, is er ruim zon en is er vandaag nog niet geladen: nieuwe run (vervangt de gewone laadbeurt).
+    - Bij de start wordt *1x laden* (HwcSFMode = load) gezet, zodat de WP ook laadt als de boiler al binnen de laadhysterese zit.
+    - Boiler op 60 °C: datum bijwerken en terug naar de basis-setpoint (of vakantie-setpoint).
+
+    **Veiligheid:** geen lange wachtstappen, dus herstartbestendig. Niet binnen 4 uur op temperatuur, of om de afbreektijd nog bezig: afbreken en volgende dag opnieuw.
+
+    Vereist: package `vaillant_wp.yaml`. Getest met aroTHERM plus + sensoCOMFORT (BASV3) via ebusd.
+  domain: automation
+  homeassistant:
+    min_version: "2024.10.0"
+  input:
+    entities:
+      name: Entities
+      icon: mdi:link-variant
+      input:
+        net_power:
+          name: Netvermogen excl. warmtepomp (W)
+          default: sensor.wp_netvermogen_excl_warmtepomp
+          selector:
+            entity:
+              filter: {domain: sensor, device_class: power}
+        wp_power:
+          name: Elektrisch vermogen warmtepomp (W)
+          default: sensor.wp_elektrisch_vermogen
+          selector:
+            entity:
+              filter: {domain: sensor, device_class: power}
+        statuscode:
+          name: WP statuscode (ebusd HMU RunDataStatuscode)
+          selector:
+            entity:
+              filter: {domain: sensor}
+        boiler_temp:
+          name: Boilertemperatuur
+          default: sensor.wp_boiler_temperatuur
+          selector:
+            entity:
+              filter: {domain: sensor, device_class: temperature}
+        boiler_setpoint:
+          name: Boiler-setpoint (ebusd HwcTempDesired)
+          description: Proefdraaien? Kies input_number.vaillant_wp_test_boiler_setpoint.
+          selector:
+            entity:
+              filter: {domain: [number, input_number]}
+        sfmode:
+          name: Speciale functie warm water (ebusd HwcSFMode)
+          description: Proefdraaien? Kies input_select.vaillant_wp_test_sfmode.
+          selector:
+            entity:
+              filter: {domain: [select, input_select]}
+        laadtijd_vandaag:
+          name: Boiler laadtijd vandaag (h)
+          default: sensor.wp_boiler_laadtijd_vandaag
+          selector:
+            entity:
+              filter: {domain: sensor}
+        legionella_actief:
+          name: Legionella-cyclus actief
+          default: input_boolean.vaillant_wp_legionella_actief
+          selector:
+            entity:
+              filter: {domain: input_boolean}
+        laatste_legionella:
+          name: Laatste legionella-cyclus
+          default: input_datetime.vaillant_wp_laatste_legionella
+          selector:
+            entity:
+              filter: {domain: input_datetime}
+        vakantie:
+          name: Vakantiemodus
+          default: input_boolean.vaillant_wp_vakantie
+          selector:
+            entity:
+              filter: {domain: input_boolean}
+    instellingen:
+      name: Instellingen
+      icon: mdi:tune
+      input:
+        target_temp:
+          name: Desinfectietemperatuur (°C)
+          default: 60
+          selector:
+            number: {min: 55, max: 70, step: 1, unit_of_measurement: "°C"}
+        base_setpoint:
+          name: Terug naar (°C)
+          default: 38
+          selector:
+            number: {min: 30, max: 55, step: 1, unit_of_measurement: "°C"}
+        vacation_setpoint:
+          name: Terug naar in vakantiemodus (°C)
+          default: 35
+          selector:
+            number: {min: 25, max: 55, step: 1, unit_of_measurement: "°C"}
+        min_days:
+          name: Op zon vanaf dag
+          default: 5
+          selector:
+            number: {min: 1, max: 14, step: 1}
+        max_days:
+          name: Vangnet op dag
+          default: 7
+          selector:
+            number: {min: 2, max: 21, step: 1}
+        threshold_new:
+          name: Overschot voor nieuwe run (W)
+          default: 3000
+          selector:
+            number: {min: 500, max: 10000, step: 100, unit_of_measurement: W}
+        threshold_extend:
+          name: Overschot om een lopende run door te zetten (W)
+          default: 1500
+          selector:
+            number: {min: 300, max: 10000, step: 100, unit_of_measurement: W}
+        window_start:
+          name: Start venster
+          default: "13:00:00"
+          selector:
+            time: {}
+        window_end:
+          name: Einde venster
+          default: "17:00:00"
+          selector:
+            time: {}
+        fallback_time:
+          name: Tijd vangnet-run
+          default: "14:00:00"
+          selector:
+            time: {}
+        abort_time:
+          name: Uiterlijk afbreken om
+          default: "20:00:00"
+          selector:
+            time: {}
+
+mode: queued
+max: 5
+
+trigger_variables:
+  net_power: !input net_power
+  boiler_temp: !input boiler_temp
+  th_new: !input threshold_new
+  th_extend: !input threshold_extend
+  target: !input target_temp
+
+variables:
+  boiler_setpoint: !input boiler_setpoint
+  sfmode: !input sfmode
+  wp_power: !input wp_power
+  statuscode: !input statuscode
+  laadtijd: !input laadtijd_vandaag
+  laatste_legionella: !input laatste_legionella
+  vakantie: !input vakantie
+  base: !input base_setpoint
+  vac: !input vacation_setpoint
+  min_days: !input min_days
+  max_days: !input max_days
+  dagen_sinds: >
+    {{ ((now().timestamp() - (state_attr(laatste_legionella, 'timestamp') | float(0))) / 86400) | round(2) }}
+  terugzet_temp: "{{ vac if is_state(vakantie, 'on') else base }}"
+
+triggers:
+  - id: start_zon
+    trigger: template
+    value_template: "{{ states(net_power) | float(0) <= -th_new }}"
+    for: {minutes: 10}
+  - id: start_zon
+    trigger: template
+    value_template: "{{ states(net_power) | float(0) <= -th_extend }}"
+    for: {minutes: 5}
+  - id: start_zon
+    trigger: state
+    entity_id: !input statuscode
+    to: [hwc_prerun, hwc_compressor_active]
+  - id: start_zon
+    trigger: numeric_state
+    entity_id: !input wp_power
+    above: 300
+    for: {minutes: 6}
+  - id: start_zon
+    trigger: time
+    at: !input window_start
+  - id: start_vangnet
+    trigger: time
+    at: !input fallback_time
+  - id: klaar
+    trigger: template
+    value_template: "{{ states(boiler_temp) | float(0) >= target - 0.6 }}"
+  - id: afbreken
+    trigger: state
+    entity_id: !input legionella_actief
+    to: "on"
+    for: {hours: 4}
+  - id: afbreken
+    trigger: time
+    at: !input abort_time
+
+actions:
+  - choose:
+      - alias: Start op zon (aansluiten bij laadbeurt of nieuwe run)
+        conditions:
+          - condition: trigger
+            id: start_zon
+          - condition: time
+            after: !input window_start
+            before: !input window_end
+          - condition: state
+            entity_id: !input legionella_actief
+            state: "off"
+          - condition: template
+            value_template: >
+              {% set wp = states(wp_power) | float(0) %}
+              {% set net = states(net_power) | float(0) %}
+              {% set laadt = is_state(statuscode, ['hwc_prerun', 'hwc_compressor_active']) %}
+              {{ dagen_sinds >= min_days
+                 and states(boiler_temp) | float(99) < target - 1
+                 and ((wp > 300 and laadt and net <= -th_extend)
+                      or (wp < 300 and net <= -th_new and states(laadtijd) | float(0) < 0.05)) }}
+        sequence:
+          - action: input_boolean.turn_on
+            target: {entity_id: !input legionella_actief}
+          - action: "{{ boiler_setpoint.split('.')[0] }}.set_value"
+            target: {entity_id: !input boiler_setpoint}
+            data: {value: "{{ target }}"}
+          - action: "{{ sfmode.split('.')[0] }}.select_option"
+            target: {entity_id: !input sfmode}
+            data: {option: load}
+          - action: logbook.log
+            data:
+              name: Vaillant WP-kit
+              message: "Legionella gestart: setpoint {{ target }} °C, 1x laden (dag {{ dagen_sinds }})"
+              entity_id: !input boiler_setpoint
+      - alias: Vangnet (geen bruikbare zon tot dag max)
+        conditions:
+          - condition: trigger
+            id: start_vangnet
+          - condition: state
+            entity_id: !input legionella_actief
+            state: "off"
+          - condition: template
+            value_template: "{{ dagen_sinds >= max_days and states(boiler_temp) | float(99) < target - 1 }}"
+        sequence:
+          - action: input_boolean.turn_on
+            target: {entity_id: !input legionella_actief}
+          - action: "{{ boiler_setpoint.split('.')[0] }}.set_value"
+            target: {entity_id: !input boiler_setpoint}
+            data: {value: "{{ target }}"}
+          - action: "{{ sfmode.split('.')[0] }}.select_option"
+            target: {entity_id: !input sfmode}
+            data: {option: load}
+          - action: logbook.log
+            data:
+              name: Vaillant WP-kit
+              message: "Legionella gestart: setpoint {{ target }} °C, 1x laden (dag {{ dagen_sinds }})"
+              entity_id: !input boiler_setpoint
+      - alias: Op temperatuur
+        conditions:
+          - condition: trigger
+            id: klaar
+        sequence:
+          - action: input_datetime.set_datetime
+            target: {entity_id: !input laatste_legionella}
+            data: {timestamp: "{{ now().timestamp() }}"}
+          - if:
+              - condition: state
+                entity_id: !input legionella_actief
+                state: "on"
+            then:
+              - action: "{{ boiler_setpoint.split('.')[0] }}.set_value"
+                target: {entity_id: !input boiler_setpoint}
+                data: {value: "{{ terugzet_temp }}"}
+              - action: input_boolean.turn_off
+                target: {entity_id: !input legionella_actief}
+              - action: "{{ sfmode.split('.')[0] }}.select_option"
+                target: {entity_id: !input sfmode}
+                data: {option: auto}
+              - action: logbook.log
+                data:
+                  name: Vaillant WP-kit
+                  message: "Legionella klaar: setpoint terug naar {{ terugzet_temp }} °C"
+                  entity_id: !input boiler_setpoint
+      - alias: Afbreken (time-out of afbreektijd)
+        conditions:
+          - condition: trigger
+            id: afbreken
+          - condition: state
+            entity_id: !input legionella_actief
+            state: "on"
+        sequence:
+          - action: "{{ boiler_setpoint.split('.')[0] }}.set_value"
+            target: {entity_id: !input boiler_setpoint}
+            data: {value: "{{ terugzet_temp }}"}
+          - action: input_boolean.turn_off
+            target: {entity_id: !input legionella_actief}
+          - action: "{{ sfmode.split('.')[0] }}.select_option"
+            target: {entity_id: !input sfmode}
+            data: {option: auto}
+          - action: logbook.log
+            data:
+              name: Vaillant WP-kit
+              message: "Legionella afgebroken: setpoint terug naar {{ terugzet_temp }} °C"
+              entity_id: !input boiler_setpoint
