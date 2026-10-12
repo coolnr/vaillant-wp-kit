@@ -8,7 +8,7 @@ blueprint:
     **Hoe**
     - Flexibel venster: vanaf dag *min* op zon, uiterlijk op dag *max* een vangnet-run.
     - Laadt de compressor al warm water en is er genoeg zon: de lopende run wordt doorgezet naar 60 °C.
-    - Staat de WP stil, is er ruim zon en is er vandaag nog niet geladen: nieuwe run (vervangt de gewone laadbeurt).
+    - Staat de WP stil of draait hij voor de verwarming, is er ruim zon en is er vandaag nog niet geladen: nieuwe run (vervangt de gewone laadbeurt).
     - Bij de start wordt *1x laden* (HwcSFMode = load) gezet, zodat de WP ook laadt als de boiler al binnen de laadhysterese zit.
     - Boiler op 60 °C: datum bijwerken en terug naar de basis-setpoint (of vakantie-setpoint).
 
@@ -40,6 +40,24 @@ blueprint:
           selector:
             entity:
               filter: {domain: sensor}
+        hwc_states:
+          name: Statuscodes "boiler laden"
+          description: Statuscodes waarbij de WP warm water laadt. Standaard goed voor aroTHERM plus.
+          default: [hwc_prerun, hwc_compressor_active]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [hwc_prerun, hwc_compressor_active, hwc_overrun, hwc_compressor_blocked]
+        heat_states:
+          name: Statuscodes "verwarmen"
+          description: Statuscodes waarbij de WP voor de vloer/verwarming draait. Ook dan mag een zonnerun voor de boiler starten; de WP schakelt dan door naar warm water, meestal zonder extra start.
+          default: [heat_prerun, heat_compressor_active, heat_overrun, heat_compressor_blocked]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [heat_prerun, heat_compressor_active, heat_overrun, heat_compressor_blocked]
         boiler_temp:
           name: Boilertemperatuur
           default: sensor.wp_boiler_temperatuur
@@ -153,6 +171,8 @@ trigger_variables:
   target: !input target_temp
 
 variables:
+  hwc_states: !input hwc_states
+  heat_states: !input heat_states
   boiler_setpoint: !input boiler_setpoint
   sfmode: !input sfmode
   wp_power: !input wp_power
@@ -180,7 +200,7 @@ triggers:
   - id: start_zon
     trigger: state
     entity_id: !input statuscode
-    to: [hwc_prerun, hwc_compressor_active]
+    to: !input hwc_states
   - id: start_zon
     trigger: numeric_state
     entity_id: !input wp_power
@@ -220,11 +240,13 @@ actions:
             value_template: >
               {% set wp = states(wp_power) | float(0) %}
               {% set net = states(net_power) | float(0) %}
-              {% set laadt = is_state(statuscode, ['hwc_prerun', 'hwc_compressor_active']) %}
+              {% set laadt = states(statuscode) in hwc_states %}
+              {% set verwarmt = states(statuscode) in heat_states %}
               {{ dagen_sinds >= min_days
                  and states(boiler_temp) | float(99) < target - 1
                  and ((wp > 300 and laadt and net <= -th_extend)
-                      or (wp < 300 and net <= -th_new and states(laadtijd) | float(0) < 0.05)) }}
+                      or ((wp < 300 or verwarmt) and net <= -th_new
+                          and states(laadtijd) | float(0) < 0.05)) }}
         sequence:
           - action: input_boolean.turn_on
             target: {entity_id: !input legionella_actief}

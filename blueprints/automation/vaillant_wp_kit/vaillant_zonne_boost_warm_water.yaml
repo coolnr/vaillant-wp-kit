@@ -7,8 +7,8 @@ blueprint:
 
     **Regels**
     1. **Verlengen:** laadt de WP al warm water en is er genoeg overschot, dan direct naar de boost-temperatuur. Kost geen extra start.
-    2. **Nieuwe run:** WP staat stil, ruim overschot, boiler laag genoeg om echt te gaan laden (boost − laadhysterese − 1 °C marge), en vandaag nog niet geladen óf boiler flink gebruikt.
-    3. **Terugzetten:** als het overschot weg is (15 min) of uiterlijk op de deadline, maar **nooit midden in een laadbeurt**. Een afgebroken run kost bij terugkerende zon een extra start.
+    2. **Nieuwe run:** WP staat stil of draait voor de verwarming, ruim overschot, boiler laag genoeg om echt te gaan laden (boost − laadhysterese − 1 °C marge), en vandaag nog niet geladen óf boiler flink gebruikt.
+    3. **Terugzetten:** als het overschot weg is (15 min) of uiterlijk op de deadline, maar **nooit midden in een boilerlading**. Een afgebroken run kost bij terugkerende zon een extra start. Draait de WP alleen voor de verwarming, dan mag terugzetten wel.
 
     Slaat zichzelf over tijdens of vlak voor een legionella-cyclus (blueprint *Vaillant WP – legionella op zon*).
 
@@ -46,6 +46,24 @@ blueprint:
             entity:
               filter:
                 domain: sensor
+        hwc_states:
+          name: Statuscodes "boiler laden"
+          description: Statuscodes waarbij de WP warm water laadt. Standaard goed voor aroTHERM plus.
+          default: [hwc_prerun, hwc_compressor_active]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [hwc_prerun, hwc_compressor_active, hwc_overrun, hwc_compressor_blocked]
+        heat_states:
+          name: Statuscodes "verwarmen"
+          description: Statuscodes waarbij de WP voor de vloer/verwarming draait. Ook dan mag een zonnerun voor de boiler starten; de WP schakelt dan door naar warm water, meestal zonder extra start.
+          default: [heat_prerun, heat_compressor_active, heat_overrun, heat_compressor_blocked]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [heat_prerun, heat_compressor_active, heat_overrun, heat_compressor_blocked]
         boiler_temp:
           name: Boilertemperatuur
           default: sensor.wp_boiler_temperatuur
@@ -184,7 +202,7 @@ triggers:
   - id: laden_start
     trigger: state
     entity_id: !input statuscode
-    to: [hwc_prerun, hwc_compressor_active]
+    to: !input hwc_states
   - id: compressor_draait
     # 6 min: de statuscode loopt soms minuten achter op het echte verbruik.
     trigger: numeric_state
@@ -202,11 +220,18 @@ triggers:
     trigger: time
     at: !input reset_deadline
   - id: sessie_klaar
-    # Laadbeurt afgelopen: alsnog terugzetten als een eerdere reset werd tegengehouden.
+    # Compressor gestopt: alsnog terugzetten als een eerdere reset werd tegengehouden.
     trigger: numeric_state
     entity_id: !input wp_power
     below: 100
     for: {minutes: 2}
+  - id: laden_klaar
+    # Boilerlading voorbij, ook als de WP daarna doorgaat met verwarmen
+    # (dan zakt het vermogen niet onder 100 W).
+    trigger: state
+    entity_id: !input statuscode
+    from: !input hwc_states
+    for: {minutes: 1}
 
 conditions:
   - condition: state
@@ -238,7 +263,7 @@ actions:
                     above: 300
                   - condition: state
                     entity_id: !input statuscode
-                    state: [hwc_prerun, hwc_compressor_active]
+                    state: !input hwc_states
                   - condition: template
                     value_template: >
                       {{ states(boiler_temp) | float(99) < boost
@@ -252,11 +277,17 @@ actions:
                       name: Vaillant WP-kit
                       message: "Zonne-boost: setpoint naar {{ boost }} °C ({{ trigger.id }})"
                       entity_id: !input boiler_setpoint
-              - alias: "Nieuwe run: WP stil, ruim overschot, boiler laag genoeg"
+              - alias: "Nieuwe run: WP stil of verwarmt, ruim overschot, boiler laag genoeg"
                 conditions:
-                  - condition: numeric_state
-                    entity_id: !input wp_power
-                    below: 300
+                  - alias: WP staat stil, of draait voor de verwarming
+                    condition: or
+                    conditions:
+                      - condition: numeric_state
+                        entity_id: !input wp_power
+                        below: 300
+                      - condition: state
+                        entity_id: !input statuscode
+                        state: !input heat_states
                   - condition: template
                     value_template: >
                       {% set t = states(boiler_temp) | float(99) %}
@@ -275,15 +306,28 @@ actions:
       - alias: Terugzetten naar basis-setpoint
         conditions:
           - condition: trigger
-            id: [overschot_weg, deadline, sessie_klaar]
+            id: [overschot_weg, deadline, sessie_klaar, laden_klaar]
           - condition: template
             value_template: "{{ states(boiler_setpoint) | float(0) > base }}"
-          - alias: Nooit midden in een laadbeurt
+          - alias: Nooit midden in een boilerlading (wel als de WP alleen verwarmt)
             condition: not
             conditions:
-              - condition: numeric_state
-                entity_id: !input wp_power
-                above: 300
+              - condition: or
+                conditions:
+                  - condition: state
+                    entity_id: !input statuscode
+                    state: !input hwc_states
+                  - alias: Vermogen zonder verwarm-status (buffer voor achterlopende statuscode)
+                    condition: and
+                    conditions:
+                      - condition: numeric_state
+                        entity_id: !input wp_power
+                        above: 300
+                      - condition: not
+                        conditions:
+                          - condition: state
+                            entity_id: !input statuscode
+                            state: !input heat_states
           - alias: Geen valse 'sessie klaar' na herstart of eBUS-blip
             condition: template
             value_template: >

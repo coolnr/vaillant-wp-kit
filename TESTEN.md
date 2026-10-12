@@ -40,6 +40,8 @@ Tip: klik met rechts op de link en kies *Link opslaan als…*, of open hem en ko
 
 **Niet** plaatsen tijdens proefdraaien: `vaillant_wp_thermostaat.yaml` als je al eigen thermostaat-entities voor je Vaillant hebt. Die stuurt namelijk wél echt naar de warmtepomp.
 
+Het basispackage bevat ook een automation die de statuscode van de warmtepomp sneller laat verversen. Heb je zelf al zo'n automation, dan is dubbel onschadelijk.
+
 Open `vaillant_wp.yaml` en vervang:
 
 | Zoek | Vervang door | Voorbeeld |

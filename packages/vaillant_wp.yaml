@@ -15,6 +15,7 @@
 #        heating_ebusd_basv3      -> prefix van je regelaar (sensoCOMFORT/VRC720),
 #                                    bijv. ebusd_basv2 of ebusd_basv3
 #        ebusd_hmu                -> prefix van je buitenunit (HMU)
+#        ebusd/hmu/               -> MQTT-topic van je buitenunit (meestal goed)
 #   3. Herstart Home Assistant.
 #
 # GETEST MET
@@ -22,7 +23,8 @@
 #   Andere regelaars: eerst controleren of de entities hieronder bestaan.
 #
 # HISTORIE
-#   2026-10-08: eerste versie, afgeleid van de productie-setup (categorie WP).
+#   2026-10-08: eerste versie, afgeleid van de productie-setup.
+#   2026-10-12: automation voor poll-prioriteit van de statuscode toegevoegd.
 # =============================================================================
 
 input_boolean:
@@ -140,3 +142,33 @@ utility_meter:
     unique_id: vaillant_wp_compressorstarts_vandaag
     source: sensor.wp_compressorstarts_totaal
     cycle: daily
+
+automation:
+  # De statuscode van de WP (RunDataStatuscode) staat standaard achteraan in de
+  # poll-rij van ebusd en kan tot ~10 minuten achterlopen. De blueprints gebruiken
+  # hem om "boiler laden" en "verwarmen" te herkennen, dus hij moet actueel zijn.
+  - id: vaillant_wp_statuscode_poll_prioriteit
+    alias: "Vaillant WP – statuscode poll-prioriteit"
+    description: >-
+      DOEL: de statuscode van de warmtepomp sneller laten verversen. HOE: via MQTT
+      krijgt het bericht poll-prioriteit 1 (payload '?1' op
+      ebusd/hmu/RunDataStatuscode/get), zodat ebusd het elke poll-ronde opvraagt.
+      Die prioriteit geldt tot ebusd herstart; daarom opnieuw na een HA-start, als
+      ebusd meldt dat hij draait, en elk uur als vangnet. Alleen de statuscode:
+      elke extra prioriteit-1-waarde maakt de rij voor de rest langer.
+      Onderdeel van de Vaillant WP-kit (packages/vaillant_wp.yaml).
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: mqtt
+        topic: "ebusd/global/running"
+        payload: "true"
+      - trigger: time_pattern
+        hours: "/1"
+    actions:
+      - delay: {seconds: 90}
+      - action: mqtt.publish
+        data:
+          topic: "ebusd/hmu/RunDataStatuscode/get"
+          payload: "?1"

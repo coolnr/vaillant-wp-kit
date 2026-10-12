@@ -163,7 +163,7 @@ Ga naar *Instellingen → Automations & scènes → Blueprints*, klik op een blu
 | Vloerbuffer | Zone | `z1opmode` of je zone-thermostaat |
 | | Extra aanvoertemperatuur | `hc1excesstemp` |
 
-Loop daarna de instellingen per blueprint na. Zorg dat ze passen bij je warmtepomp (zie stap 6). Sla op.
+Loop daarna de instellingen per blueprint na. Zorg dat ze passen bij je warmtepomp (zie stap 6). De lijsten met statuscodes ("boiler laden" en "verwarmen") staan standaard goed voor een aroTHERM plus. Sla op.
 
 *Proefdraaien?* Kies bij de doelen (setpoint, speciale functie, extra aanvoertemperatuur) de TEST-helpers. Zie [TESTEN.md](TESTEN.md).
 
@@ -180,6 +180,7 @@ Loop daarna de instellingen per blueprint na. Zorg dat ze passen bij je warmtepo
 
 - **Logboek:** elke beslissing van de kit staat erin, onder "Vaillant WP-kit". Bijvoorbeeld *"Zonne-boost: setpoint naar 54 °C (nieuw)"*.
 - **Traces:** *Instellingen → Automations → klik een automation → Traces*. Hier zie je per keer waarom hij wel of niet iets deed.
+- **Statuscode actueel?** `sensor.ebusd_hmu_rundatastatuscode` moet binnen een minuut omspringen als de warmtepomp start. Het package zet daarvoor zelf een hogere poll-prioriteit.
 - **Compressorstarts:** `sensor.wp_compressorstarts_vandaag` laat zien hoe vaak de compressor vandaag startte. Eén tot drie keer per dag is goed.
 
 Een dashboard zit nog niet in de kit; dat volgt.
@@ -194,6 +195,7 @@ Een dashboard zit nog niet in de kit; dat volgt.
 | `wp_*`-sensoren staan op "niet beschikbaar" | De prefix of de netvermogen-sensor in `vaillant_wp.yaml` klopt niet. Controleer [stap 2 en 3](#2-je-eigen-namen-opzoeken). |
 | Configuratie controleren geeft een fout bij `packages` | Waarschijnlijk staat er twee keer `homeassistant:` in `configuration.yaml`. Voeg ze samen. |
 | Thermostaatklok staat op "onbekend" | Normaal na een herstart; de kit vraagt de waarden binnen een minuut opnieuw op. Blijft het zo, controleer dan of ebusd draait. |
+| Statuscode loopt minuten achter | De automation "Vaillant WP – statuscode poll-prioriteit" uit het package draait niet, of de MQTT-topic klopt niet (`ebusd/hmu/RunDataStatuscode/get`). Werkt het nog niet goed genoeg, verlaag dan de poll-interval van ebusd (`--pollinterval`). |
 | De kit boost nooit | Controleer: het netvermogen is negatief bij zon, het boostvenster valt samen met het warmwater-tijdvenster, en de boiler zit laag genoeg (onder boost − hysterese − 1 °C). De trace laat zien welke voorwaarde faalde. |
 | Vreemd gedrag of extra starts | Draaien er nog andere automations die dezelfde instellingen sturen? Zet die uit, of begin met [proefdraaien](TESTEN.md). |
 
@@ -222,6 +224,7 @@ De kit is ontwikkeld en getest op deze installatie. Lijkt de jouwe erop, dan is 
 | Warm water | **uniSTOR plus 300 liter** boiler (VIH RW 300) |
 | Buffervat | 50 liter |
 | Afgifte | vloerverwarming, één zone (Z1); koelen mogelijk |
+| Verdeling | buffervat parallel (4 aansluitingen), verdeler met eigen pomp; per kamer een zonethermostaat die een stelmotor (NC) op de verdeler stuurt |
 | Koppeling met HA | ebusd 26.1 via **MQTT**, instellingen zoals in [Stap A](#stap-a--ebus-koppeling-ebusd) |
 | Home Assistant | 2026.9 |
 | Zonnepanelen / netmeting | ca. 8 kWp, netvermogen via EVCC/P1-meter |
@@ -234,16 +237,30 @@ Deze instellingen staan in de regelaar (uitgelezen via ebusd). De kit verandert 
 |---|---|---|
 | **Zone 1 – modus** | manueel (constante temperatuur, geen tijdprogramma) | `Z1OpMode` |
 | Zone 1 – temperatuur | 21 °C | `Z1ManualTemp` |
-| Stooklijn | 0,4, zelflerend aan | `Hc1HeatCurve`, `AdaptHeatCurve` |
+| Stooklijn | 0,4 (zelflerend staat aan, maar werkt mogelijk alleen met *expanded*) | `Hc1HeatCurve`, `AdaptHeatCurve` |
 | Aanvoertemperatuur verwarmen | min 17 °C, max 45 °C | `Hc1HeatingFlowTempMin/Max` |
 | Zomergrens (verwarmen uit boven) | 17 °C buiten (gemiddeld) | `Hc1SummerTempLimit` |
-| Ruimtetemperatuur-invloed | uitgebreid | `Hc1RoomTempModulation` |
+| Ruimtetemperatuur-invloed | **active** (was expanded, zie hieronder) | `Hc1RoomTempModulation` |
 | Koelen | mogelijk, standaard uit; min. aanvoer 18 °C, dauwpuntbewaking aan | `Z1CoolingOpMode`, `Hc1CoolingFlowTempMin` |
 | **Warm water – modus** | auto, met tijdvenster **13:00–17:00** | `HwcOpMode` |
 | Warm water – basis-setpoint | **38 °C** (de kit boost tijdelijk naar 54/60 °C) | `HwcTempDesired` |
 | Laadhysterese | 6 K (laadt pas onder 32 °C bij setpoint 38) | `CylinderChargeHyst` |
 | Legionella van Vaillant | **uit**: de kit regelt dit op zon | `HwcLegionellaDay` |
 | Stille modus | geen tijdvakken ingesteld | `SilentTimer` |
+
+#### Kamerinvloed: active of expanded?
+
+Deze instelling bepaalt hoe de kamertemperatuur bij de sensoCOMFORT de verwarming beïnvloedt. Bij de testinstallatie is hij van **expanded** naar **active** gezet.
+
+| | Expanded | Active |
+|---|---|---|
+| Wat het doet | Stooklijn + kamercorrectie, **en** de verwarming gaat helemaal uit zodra de kamer met de regelaar ongeveer 0,2 °C te warm is | Stooklijn + kamercorrectie (circa 2,5 °C lagere aanvoer per graad te warm), maar **geen** volledige uitschakeling. Alleen de zomergrens schakelt nog uit |
+| Goed als | De kamer met de regelaar representatief is voor het hele huis | De kamer met de regelaar zon krijgt of warmer is dan de rest |
+| Nadeel | Zon in die ene kamer zet de verwarming voor het hele huis uit (bij de testinstallatie soms 20+ uur), terwijl kamers zonder zon afkoelen | Overdag wordt doorgestookt met lauw water. Dat geeft meer verbruik op zonuren, een gelijkmatiger huis, en in het tussenseizoen mogelijk iets meer starts |
+
+Met *active* draait de warmtepomp 's middags vaker voor de vloer. De blueprints houden daar rekening mee: een zonnerun voor de boiler mag ook starten als de warmtepomp voor de verwarming draait. De Vaillant schakelt dan door naar warm water (voorrang), meestal zonder extra compressorstart. De vloerbuffer werkt met *active* ook beter, omdat de verwarming niet meer helemaal uitgaat.
+
+**Zonethermostaten per kamer:** sluiten er veel groepen tegelijk, dan kan de warmtepomp zijn warmte minder kwijt en worden de runs korter. Laat bij voorkeur een paar groepen altijd open (bij de testinstallatie: badkamer).
 
 **Waar stel je dit in?** Het zijn instellingen in de regelaar zelf. Je kunt ze wijzigen op de sensoCOMFORT (een deel alleen in het installateursmenu), een deel in de myVAILLANT-app, of via de ebusd-entities in Home Assistant. Het blijft dezelfde instelling; de laatste wijziging geldt.
 
@@ -257,7 +274,7 @@ Deze instellingen staan in de regelaar (uitgelezen via ebusd). De kit verandert 
 
 | Onderdeel | Bestand | Wat het doet |
 |---|---|---|
-| Basispackage | `packages/vaillant_wp.yaml` | Genormaliseerde `wp_*`-sensoren bovenop ebusd, plus helpers |
+| Basispackage | `packages/vaillant_wp.yaml` | Genormaliseerde `wp_*`-sensoren bovenop ebusd, helpers, en een automation die de statuscode poll-prioriteit 1 geeft (`?1` op de `/get`-topic) |
 | Thermostaat (optioneel) | `packages/vaillant_wp_thermostaat.yaml` | 2 MQTT-climate-entities, 2 bridge-automations (verwarmen/koelen als 2 Vaillant-circuits), 1 automation die na een herstart de waarden opvraagt (`/get`-topics) |
 | Proefdraaien (optioneel) | `packages/vaillant_wp_proefdraaien.yaml` | TEST-helpers (`input_number`/`input_select`) als veilig doel |
 | Blueprints | `blueprints/automation/vaillant_wp_kit/` | Zonne-boost, legionella, vloerbuffer. De beslisregels staan in de beschrijving van elke blueprint |
@@ -279,6 +296,7 @@ Deze instellingen staan in de regelaar (uitgelezen via ebusd). De kit verandert 
 - **Netvermogen zonder de WP zelf.** Anders ziet een draaiende compressor zijn eigen verbruik als "geen overschot", stopt de sturing de run, en start de compressor opnieuw zodra de zon terugkomt. Dat gaf in de praktijk 2 tot 3 starts per dag in plaats van 1.
 - **Een run die loopt, wordt altijd afgemaakt.** Terugzetten gebeurt pas na de laadbeurt (WP-vermogen < 100 W, 2 min), met een check tegen valse "klaar" na een herstart.
 - **Rekening houden met de laadhysterese.** Een nieuwe run alleen als de boiler onder boost − hysterese − 1 °C zit. Een lopende run wordt verlengd; dat kost geen extra start.
+- **Statuscodes als inputs.** "Boiler laden" (`hwc_*`) en "verwarmen" (`heat_*`) zijn instelbare lijsten. Nieuwe run: WP stil **of** verwarmend. Terugzetten: niet tijdens een boilerlading (statuscode `hwc_*`, of vermogen > 300 W zonder `heat_*`-status, als buffer voor een achterlopende statuscode). Extra trigger zodra de statuscode `hwc_*` 1 minuut verlaat.
 - **"Vandaag al geladen".** Na een laadbeurt alleen opnieuw boosten als de boiler flink gebruikt is.
 - **Herstartbestendig.** Geen lange wachtstappen; vaste vangnetten (deadline, time-out, afbreektijd), zodat een setpoint nooit blijft hangen.
 - **Comfort blijft bij de WP.** Alleen tijdelijke verhogingen, altijd terug naar de basis.
@@ -299,6 +317,9 @@ MIT, zie [LICENSE](LICENSE). Gebruik op eigen risico. Niet gelieerd aan Vaillant
 ## Wijzigingen
 
 - **Na 0.2 (in ontwikkeling):**
+  - Zonne-boost en legionella: een nieuwe run mag ook starten als de WP voor de verwarming draait. Terugzetten kijkt naar de boilerlading in plaats van alleen het WP-vermogen, met een extra trigger als de lading klaar is. Statuscodes zijn nu instelbare inputs.
+  - Package: automation die de statuscode poll-prioriteit 1 geeft.
+  - README: uitleg over kamerinvloed active of expanded, en over zonethermostaten.
   - Optioneel package met thermostaatknoppen (climate) voor zone 1 en de boiler, inclusief het opvragen van de waarden na een herstart.
   - README herschreven: uitleg voor beginners, ebusd-installatie, problemen oplossen, bijwerken en verwijderen.
   - Testinstallatie en instellingen van de warmtepomp gedocumenteerd.
