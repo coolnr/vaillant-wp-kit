@@ -2,7 +2,7 @@
 
 **Laat je Vaillant-warmtepomp slimmer omgaan met je eigen zonnestroom, zonder hem onnodig vaak aan en uit te laten springen.**
 
-*Versie 0.2 (oktober 2026). Afgeleid van een installatie die sinds mei 2026 dagelijks draait.*
+*Versie 0.3 (12 oktober 2026). Afgeleid van een installatie die sinds mei 2026 dagelijks draait.*
 
 ---
 
@@ -316,7 +316,7 @@ MIT, zie [LICENSE](LICENSE). Gebruik op eigen risico. Niet gelieerd aan Vaillant
 
 ## Wijzigingen
 
-- **Na 0.2 (in ontwikkeling):**
+- **0.3 (12 okt 2026):**
   - Zonne-boost en legionella: een nieuwe run mag ook starten als de WP voor de verwarming draait. Terugzetten kijkt naar de boilerlading in plaats van alleen het WP-vermogen, met een extra trigger als de lading klaar is. Statuscodes zijn nu instelbare inputs.
   - Package: automation die de statuscode poll-prioriteit 1 geeft.
   - README: uitleg over kamerinvloed active of expanded, en over zonethermostaten.
