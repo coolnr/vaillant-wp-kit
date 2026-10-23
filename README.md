@@ -27,6 +27,8 @@ Heb je zonnepanelen en een Vaillant-warmtepomp? Dan lever je overdag vaak stroom
 > Het draait bij mij dagelijks, maar het is getest op één installatie. Er kunnen dus gaten of fouten in zitten, zeker bij een andere regelaar, firmware of ebusd-configuratie. Twijfel je? Begin dan met proefdraaien (zie [Waar begin je?](#waar-begin-je)).
 >
 > Loop je ergens tegenaan, of heb je een verbetering? Open een [issue](https://github.com/coolnr/vaillant-wp-kit/issues). Elke melding helpt om de kit voor iedereen beter te maken.
+>
+> **Benieuwd hoe mijn warmtepomp is ingesteld?** In [INSTELLINGEN.md](INSTELLINGEN.md) staan alle instellingen van mijn installatie (stooklijn, warm water, compressor, pompen), met per instelling waar je hem verandert: via eBUS, de myVAILLANT-app of het installateursmenu.
 
 ---
 
@@ -41,6 +43,7 @@ Heb je zonnepanelen en een Vaillant-warmtepomp? Dan lever je overdag vaak stroom
 7. [Problemen oplossen](#problemen-oplossen)
 8. [Bijwerken en verwijderen](#bijwerken-en-verwijderen)
 9. [Mijn testinstallatie](#mijn-testinstallatie)
+   - **Alle instellingen van de warmtepomp: [INSTELLINGEN.md](INSTELLINGEN.md)**
 10. [Voor gevorderden](#voor-gevorderden)
 
 ---
@@ -319,7 +322,7 @@ MIT, zie [LICENSE](LICENSE). Gebruik op eigen risico. Niet gelieerd aan Vaillant
 
 ## Wijzigingen
 
-- **23 okt 2026 (documentatie):** nieuw [INSTELLINGEN.md](INSTELLINGEN.md) met alle instellingen van de testinstallatie, ingedeeld naar eBUS, myVAILLANT, installateursmenu en hydrauliek. Instellingentabel in de README bijgewerkt (stooklijn 0,25, zomergrens 15 °C, zelflerend uit).
+- **23 okt 2026 (documentatie):** nieuw [INSTELLINGEN.md](INSTELLINGEN.md), met verwijzing in de intro en de inhoudsopgave, met alle instellingen van de testinstallatie, ingedeeld naar eBUS, myVAILLANT, installateursmenu en hydrauliek. Instellingentabel in de README bijgewerkt (stooklijn 0,25, zomergrens 15 °C, zelflerend uit).
 - **0.3 (12 okt 2026):**
   - Zonne-boost en legionella: een nieuwe run mag ook starten als de WP voor de verwarming draait. Terugzetten kijkt naar de boilerlading in plaats van alleen het WP-vermogen, met een extra trigger als de lading klaar is. Statuscodes zijn nu instelbare inputs.
   - Package: automation die de statuscode poll-prioriteit 1 geeft.
