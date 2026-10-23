@@ -231,22 +231,24 @@ De kit is ontwikkeld en getest op deze installatie. Lijkt de jouwe erop, dan is 
 
 ### Instellingen van de warmtepomp
 
-Deze instellingen staan in de regelaar (uitgelezen via ebusd). De kit verandert hier alleen tijdelijk de boiler-setpoint, "1x laden" en de extra aanvoertemperatuur.
+De kit verandert in de regelaar alleen tijdelijk de boiler-setpoint, "1x laden" en de extra aanvoertemperatuur. De belangrijkste vaste instellingen:
 
 | Wat | Instelling | ebusd-naam |
 |---|---|---|
 | **Zone 1 – modus** | manueel (constante temperatuur, geen tijdprogramma) | `Z1OpMode` |
 | Zone 1 – temperatuur | 21 °C | `Z1ManualTemp` |
-| Stooklijn | 0,4 (zelflerend staat aan, maar werkt mogelijk alleen met *expanded*) | `Hc1HeatCurve`, `AdaptHeatCurve` |
+| Stooklijn | 0,25 (zelflerend uit) | `Hc1HeatCurve`, `AdaptHeatCurve` |
 | Aanvoertemperatuur verwarmen | min 17 °C, max 45 °C | `Hc1HeatingFlowTempMin/Max` |
-| Zomergrens (verwarmen uit boven) | 17 °C buiten (gemiddeld) | `Hc1SummerTempLimit` |
+| Zomergrens (verwarmen uit boven) | 15 °C buiten (gemiddeld) | `Hc1SummerTempLimit` |
 | Ruimtetemperatuur-invloed | **active** (was expanded, zie hieronder) | `Hc1RoomTempModulation` |
-| Koelen | mogelijk, standaard uit; min. aanvoer 18 °C, dauwpuntbewaking aan | `Z1CoolingOpMode`, `Hc1CoolingFlowTempMin` |
 | **Warm water – modus** | auto, met tijdvenster **13:00–17:00** | `HwcOpMode` |
-| Warm water – basis-setpoint | **38 °C** (de kit boost tijdelijk naar 54/60 °C) | `HwcTempDesired` |
+| Warm water – basis-setpoint | **38 °C** (de kit boost tijdelijk naar 54–60 °C) | `HwcTempDesired` |
 | Laadhysterese | 6 K (laadt pas onder 32 °C bij setpoint 38) | `CylinderChargeHyst` |
 | Legionella van Vaillant | **uit**: de kit regelt dit op zon | `HwcLegionellaDay` |
-| Stille modus | geen tijdvakken ingesteld | `SilentTimer` |
+| Compressor-hysterese verwarmen | 10 K (installateursmenu, niet via eBUS) | – |
+| Energie-integraal start | −100 °min (installateursmenu, niet via eBUS) | – |
+
+**Alle instellingen**, ingedeeld naar waar je ze instelt (eBUS, myVAILLANT, installateursmenu, hydrauliek), staan in [INSTELLINGEN.md](INSTELLINGEN.md).
 
 #### Kamerinvloed: active of expanded?
 
@@ -277,6 +279,7 @@ Met *active* draait de warmtepomp 's middags vaker voor de vloer. De blueprints 
 | Basispackage | `packages/vaillant_wp.yaml` | Genormaliseerde `wp_*`-sensoren bovenop ebusd, helpers, en een automation die de statuscode poll-prioriteit 1 geeft (`?1` op de `/get`-topic) |
 | Thermostaat (optioneel) | `packages/vaillant_wp_thermostaat.yaml` | 2 MQTT-climate-entities, 2 bridge-automations (verwarmen/koelen als 2 Vaillant-circuits), 1 automation die na een herstart de waarden opvraagt (`/get`-topics) |
 | Proefdraaien (optioneel) | `packages/vaillant_wp_proefdraaien.yaml` | TEST-helpers (`input_number`/`input_select`) als veilig doel |
+| Instellingen testinstallatie | `INSTELLINGEN.md` | Alle Vaillant-instellingen, per niveau (eBUS, myVAILLANT, installateur, hydrauliek) |
 | Blueprints | `blueprints/automation/vaillant_wp_kit/` | Zonne-boost, legionella, vloerbuffer. De beslisregels staan in de beschrijving van elke blueprint |
 
 ### Entities uit het basispackage
@@ -316,6 +319,7 @@ MIT, zie [LICENSE](LICENSE). Gebruik op eigen risico. Niet gelieerd aan Vaillant
 
 ## Wijzigingen
 
+- **23 okt 2026 (documentatie):** nieuw [INSTELLINGEN.md](INSTELLINGEN.md) met alle instellingen van de testinstallatie, ingedeeld naar eBUS, myVAILLANT, installateursmenu en hydrauliek. Instellingentabel in de README bijgewerkt (stooklijn 0,25, zomergrens 15 °C, zelflerend uit).
 - **0.3 (12 okt 2026):**
   - Zonne-boost en legionella: een nieuwe run mag ook starten als de WP voor de verwarming draait. Terugzetten kijkt naar de boilerlading in plaats van alleen het WP-vermogen, met een extra trigger als de lading klaar is. Statuscodes zijn nu instelbare inputs.
   - Package: automation die de statuscode poll-prioriteit 1 geeft.
